@@ -7,29 +7,59 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="game-root">
+  <div id="game-root" class="state-menu">
     <canvas id="game-canvas" width="640" height="360" aria-label="Jabs Lands Adventure"></canvas>
 
     <div id="menu" class="overlay visible" role="dialog" aria-label="Main menu">
-      <h1>Jabs Lands Adventure</h1>
-      <div class="menu-buttons">
-        <button id="new-game">New Game</button>
-        <button id="continue">Continue</button>
-        <button id="exit">Exit</button>
+      <div class="menu-panel">
+        <div class="menu-scene">
+          <div class="menu-glow"></div>
+          <div class="menu-hero">
+            <div class="hero-hat"></div>
+            <div class="hero-body"></div>
+            <div class="hero-staff"></div>
+          </div>
+          <div class="menu-trees"></div>
+        </div>
+        <h1 class="menu-title">JABS LANDS ADVENTURE</h1>
+        <div class="menu-buttons">
+          <button id="new-game">New Game</button>
+          <button id="continue">Continue</button>
+          <button id="exit">Exit</button>
+        </div>
+        <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
       </div>
-      <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
     </div>
 
     <div id="hud" class="overlay">
-      <div class="stat">HP: <span id="hp">0</span></div>
-      <div class="stat">Mana: <span id="mana">0</span></div>
-      <div class="stat">Level: <span id="level">1</span></div>
-      <div class="stat">Coins: <span id="coins">0</span></div>
+      <div class="hud-panel">
+        <div class="stat">
+          <span class="stat-icon">❤</span>
+          <span id="hp">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">✦</span>
+          <span id="mana">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">◆</span>
+          <span id="level">1</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">¤</span>
+          <span id="coins">0</span>
+        </div>
+      </div>
     </div>
 
     <div id="dialogue" class="overlay">
-      <div id="dialogue-text"></div>
-      <div id="dialogue-options"></div>
+      <div class="dialogue-frame">
+        <div class="dialogue-portrait"></div>
+        <div class="dialogue-content">
+          <div id="dialogue-text"></div>
+          <div id="dialogue-options"></div>
+        </div>
+      </div>
     </div>
 
     <div id="controls" class="overlay">
