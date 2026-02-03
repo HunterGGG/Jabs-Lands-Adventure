@@ -337,37 +337,52 @@ class World {
       tiles.push(row);
     }
 
-    for (let x = 4; x < 12; x += 1) {
-      tiles[6][x] = "path";
-      tiles[7][x] = "mud";
+    for (let x = 3; x < 17; x += 1) {
+      tiles[7][x] = "path";
+    }
+    for (let y = 2; y < 10; y += 1) {
+      tiles[y][9] = "path";
+    }
+    for (let x = 6; x < 13; x += 1) {
+      tiles[8][x] = "mud";
     }
 
-    tiles[8][14] = "water";
-    tiles[8][15] = "water";
-    tiles[9][14] = "water";
-    tiles[9][15] = "water";
+    const waterCells = [
+      [15, 3],
+      [16, 3],
+      [14, 4],
+      [15, 4],
+      [16, 4],
+      [14, 5],
+      [15, 5],
+      [16, 5],
+      [15, 6],
+    ];
+    waterCells.forEach(([x, y]) => {
+      tiles[y][x] = "water";
+    });
 
     return tiles;
   }
 
   generateDecorations() {
     return [
-      { type: "bush", x: 2, y: 2, imageKey: "bush1", scale: 0.6 },
-      { type: "bush", x: 4, y: 3, imageKey: "bush2", scale: 0.6 },
-      { type: "bush", x: 6, y: 2, imageKey: "bush3", scale: 0.6 },
-      { type: "bush", x: 8, y: 3, imageKey: "bush4", scale: 0.6 },
-      { type: "rock", x: 10, y: 2, imageKey: "rock1", scale: 0.55 },
-      { type: "rock", x: 12, y: 3, imageKey: "rock2", scale: 0.55 },
-      { type: "rock", x: 3, y: 7, imageKey: "rock3", scale: 0.55 },
-      { type: "rock", x: 15, y: 4, imageKey: "rock4", scale: 0.55 },
-      { type: "duck", x: 14, y: 9, imageKey: "rubberDuck", scale: 0.5 },
-      { type: "water-rock", x: 15, y: 9, imageKey: "waterRock", scale: 0.5 },
-      { type: "house", x: 3, y: 9, imageKey: "house", scale: 0.5, block: { w: 70, h: 40 } },
-      { type: "house", x: 6, y: 9, imageKey: "house2", scale: 0.5, block: { w: 70, h: 40 } },
-      { type: "barracks", x: 1, y: 6, imageKey: "barracks", scale: 0.48, block: { w: 90, h: 50 } },
-      { type: "tower", x: 15, y: 2, imageKey: "tower", scale: 0.5, block: { w: 60, h: 60 } },
-      { type: "archery", x: 12, y: 8, imageKey: "archery", scale: 0.48, block: { w: 80, h: 50 } },
-      { type: "castle", x: 9, y: 9, imageKey: "castle", scale: 0.45, block: { w: 110, h: 70 } },
+      { type: "house", x: 4, y: 8, imageKey: "house", scale: 0.5, block: { w: 70, h: 40 } },
+      { type: "house", x: 6, y: 8, imageKey: "house2", scale: 0.5, block: { w: 70, h: 40 } },
+      { type: "barracks", x: 2, y: 6, imageKey: "barracks", scale: 0.48, block: { w: 90, h: 50 } },
+      { type: "archery", x: 8, y: 6, imageKey: "archery", scale: 0.48, block: { w: 80, h: 50 } },
+      { type: "tower", x: 12, y: 5, imageKey: "tower", scale: 0.5, block: { w: 60, h: 60 } },
+      { type: "castle", x: 10, y: 8, imageKey: "castle", scale: 0.45, block: { w: 110, h: 70 } },
+      { type: "bush", x: 1, y: 2, imageKey: "bush1", scale: 0.6 },
+      { type: "bush", x: 3, y: 2, imageKey: "bush2", scale: 0.6 },
+      { type: "bush", x: 5, y: 2, imageKey: "bush3", scale: 0.6 },
+      { type: "bush", x: 7, y: 2, imageKey: "bush4", scale: 0.6 },
+      { type: "rock", x: 14, y: 2, imageKey: "rock1", scale: 0.55 },
+      { type: "rock", x: 16, y: 2, imageKey: "rock2", scale: 0.55 },
+      { type: "rock", x: 1, y: 10, imageKey: "rock3", scale: 0.55 },
+      { type: "rock", x: 3, y: 10, imageKey: "rock4", scale: 0.55 },
+      { type: "duck", x: 15, y: 5, imageKey: "rubberDuck", scale: 0.5 },
+      { type: "water-rock", x: 14, y: 6, imageKey: "waterRock", scale: 0.5 },
     ];
   }
 
@@ -420,7 +435,7 @@ class World {
     });
   }
 
-  renderBase(ctx) {
+  renderBase(ctx, time = 0) {
     for (let y = 0; y < this.height; y += 1) {
       for (let x = 0; x < this.width; x += 1) {
         const tile = this.tiles[y][x];
@@ -438,6 +453,24 @@ class World {
               this.tileSize,
               this.tileSize
             );
+            const foam = this.assets.waterFoam;
+            if (foam) {
+              const frameWidth = 64;
+              const frameHeight = 64;
+              const frames = Math.floor(foam.width / frameWidth);
+              const frame = Math.floor((time / 120) % frames);
+              ctx.drawImage(
+                foam,
+                frame * frameWidth,
+                0,
+                frameWidth,
+                frameHeight,
+                x * this.tileSize,
+                y * this.tileSize,
+                this.tileSize,
+                this.tileSize
+              );
+            }
             continue;
           }
         }
@@ -792,9 +825,9 @@ class Game {
 
   spawnEnemies() {
     return [
-      new Enemy(this.tileSize * 12, this.tileSize * 4, this.createEnemySprite(this.assets.enemyArcher)),
-      new Enemy(this.tileSize * 16, this.tileSize * 6, this.createEnemySprite(this.assets.enemyLancer, 0.6), 36),
-      new Enemy(this.tileSize * 10, this.tileSize * 8, this.createEnemySprite(this.assets.enemyArcher), 28),
+      new Enemy(this.tileSize * 16, this.tileSize * 2, this.createEnemySprite(this.assets.enemyArcher)),
+      new Enemy(this.tileSize * 17, this.tileSize * 7, this.createEnemySprite(this.assets.enemyLancer, 0.6), 36),
+      new Enemy(this.tileSize * 3, this.tileSize * 4, this.createEnemySprite(this.assets.enemyArcher), 28),
     ];
   }
 
@@ -920,7 +953,7 @@ class Game {
 
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.world.renderBase(this.ctx);
+    this.world.renderBase(this.ctx, this.lastTimestamp);
     this.world.renderClouds(this.ctx, this.lastTimestamp);
     this.world.renderDecorations(this.ctx, this.lastTimestamp);
     this.renderCommandMarker();
