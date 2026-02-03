@@ -5,6 +5,7 @@ class InputManager {
     this.keys = new Set();
     this.pointerActive = false;
     this.joystickVector = { x: 0, y: 0 };
+    this.mouse = { active: false, x: 0, y: 0 };
   }
 
   setKey(key, pressed) {
@@ -15,7 +16,15 @@ class InputManager {
     }
   }
 
-  getAxis() {
+  setMousePosition(x, y) {
+    this.mouse = { active: true, x, y };
+  }
+
+  clearMouse() {
+    this.mouse.active = false;
+  }
+
+  getAxis(playerPosition) {
     let x = 0;
     let y = 0;
     if (this.keys.has("ArrowLeft") || this.keys.has("KeyA")) x -= 1;
@@ -26,6 +35,19 @@ class InputManager {
     if (this.pointerActive) {
       x = this.joystickVector.x;
       y = this.joystickVector.y;
+    }
+
+    if (this.mouse.active && playerPosition) {
+      const dx = this.mouse.x - playerPosition.x;
+      const dy = this.mouse.y - playerPosition.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 6) {
+        x = dx / distance;
+        y = dy / distance;
+      } else {
+        x = 0;
+        y = 0;
+      }
     }
 
     return { x, y };
@@ -312,6 +334,7 @@ class World {
     this.atlas = atlas;
     this.tiles = this.generateTiles();
     this.decorations = this.generateDecorations();
+    this.blockers = this.generateBlockers();
   }
 
   generateTiles() {
@@ -361,7 +384,34 @@ class World {
       { type: "bush", x: 6, y: 9 },
       { type: "bush", x: 28, y: 8 },
       { type: "glow", x: 24, y: 4 },
+      { type: "torch", x: 14, y: 14 },
+      { type: "torch", x: 32, y: 16 },
+      { type: "fallen-log", x: 21, y: 12 },
+      { type: "fallen-log", x: 9, y: 6 },
     ];
+  }
+
+  generateBlockers() {
+    return this.decorations
+      .filter((decor) => ["tree", "rock", "stump", "bush", "fallen-log"].includes(decor.type))
+      .map((decor) => {
+        const base = { x: decor.x * this.tileSize, y: decor.y * this.tileSize };
+        switch (decor.type) {
+          case "tree":
+            return { x: base.x + 8, y: base.y + 14, w: 8, h: 10 };
+          case "rock":
+            return { x: base.x + 4, y: base.y + 8, w: 12, h: 8 };
+          case "stump":
+            return { x: base.x + 6, y: base.y + 10, w: 10, h: 6 };
+          case "bush":
+            return { x: base.x + 4, y: base.y + 10, w: 12, h: 6 };
+          case "fallen-log":
+            return { x: base.x + 2, y: base.y + 10, w: 28, h: 6 };
+          default:
+            return null;
+        }
+      })
+      .filter(Boolean);
   }
 
   isBlocked(x, y, size) {
@@ -378,7 +428,15 @@ class World {
       const tileY = Math.floor(point.y / this.tileSize);
       if (tileX < 0 || tileY < 0 || tileX >= this.width || tileY >= this.height) return true;
       const tile = this.tiles[tileY][tileX];
-      return tile === "water";
+      if (tile === "water") return true;
+      return this.blockers.some((blocker) => {
+        return (
+          point.x >= blocker.x &&
+          point.x <= blocker.x + blocker.w &&
+          point.y >= blocker.y &&
+          point.y <= blocker.y + blocker.h
+        );
+      });
     });
   }
 
@@ -391,7 +449,8 @@ class World {
     }
   }
 
-  renderDecorations(ctx) {
+  renderDecorations(ctx, time = 0) {
+    const flicker = Math.sin(time * 0.005);
     this.decorations.forEach((decor) => {
       const x = decor.x * this.tileSize;
       const y = decor.y * this.tileSize;
@@ -442,8 +501,27 @@ class World {
         case "glow":
           ctx.fillStyle = COLORS.glow;
           ctx.fillRect(x + 7, y + 6, 4, 4);
-          ctx.fillStyle = "rgba(130, 210, 120, 0.5)";
+          ctx.fillStyle = `rgba(130, 210, 120, ${0.35 + 0.15 * (flicker + 1)})`;
           ctx.fillRect(x + 4, y + 3, 10, 10);
+          break;
+        case "torch": {
+          const torchGlow = 0.6 + 0.3 * flicker;
+          ctx.fillStyle = COLORS.trunk;
+          ctx.fillRect(x + 7, y + 10, 2, 8);
+          ctx.fillStyle = "#bb5b4b";
+          ctx.fillRect(x + 5, y + 6, 6, 5);
+          ctx.fillStyle = `rgba(230, 200, 120, ${torchGlow})`;
+          ctx.fillRect(x + 3, y + 4, 10, 8);
+          break;
+        }
+        case "fallen-log":
+          ctx.fillStyle = COLORS.shadow;
+          ctx.fillRect(x + 2, y + 14, 26, 4);
+          ctx.fillStyle = COLORS.trunk;
+          ctx.fillRect(x + 2, y + 10, 26, 6);
+          ctx.fillStyle = "#6b533c";
+          ctx.fillRect(x + 6, y + 12, 4, 2);
+          ctx.fillRect(x + 16, y + 12, 4, 2);
           break;
         default:
           break;
@@ -498,6 +576,8 @@ class Game {
     this.saveExitButton = document.getElementById("save-exit");
     this.exitMainButton = document.getElementById("exit-main");
     this.mobileMenuButton = document.getElementById("mobile-menu");
+    this.titlesOverlay = document.getElementById("titles");
+    this.skipTitlesButton = document.getElementById("skip-titles");
 
     this.dialogue = new DialogueBox(document.getElementById("dialogue"));
 
@@ -517,6 +597,10 @@ class Game {
     this.lastTimestamp = 0;
     this.isRunning = false;
     this.menuState = "main";
+    this.attackRadius = 48;
+    this.attackEffects = [];
+    this.titlesTimer = null;
+    this.enemies = [];
 
     this.bindEvents();
     this.refreshContinueState();
@@ -546,6 +630,30 @@ class Game {
     this.saveExitButton.addEventListener("click", () => this.saveAndExit());
     this.exitMainButton.addEventListener("click", () => this.exitToMainMenu());
     this.mobileMenuButton.addEventListener("click", () => this.togglePauseMenu());
+    this.skipTitlesButton.addEventListener("click", () => this.hideTitles());
+
+    this.canvas.addEventListener("mousemove", (event) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      this.input.setMousePosition(x, y);
+    });
+
+    this.canvas.addEventListener("mouseleave", () => {
+      this.input.clearMouse();
+    });
+
+    this.canvas.addEventListener("click", (event) => {
+      if (!this.isRunning) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      this.handleAttack({ x, y });
+    });
 
     const joystick = document.getElementById("joystick");
     const knob = document.getElementById("joystick-knob");
@@ -589,7 +697,7 @@ class Game {
     joystick.addEventListener("pointercancel", releaseJoystick);
 
     document.getElementById("action-1").addEventListener("click", () => {
-      this.dialogue.show("Жаба выпускает тьму, но это ещё заготовка!");
+      this.handleAttack();
     });
 
     document.getElementById("action-2").addEventListener("click", () => {
@@ -631,6 +739,7 @@ class Game {
     this.player = new Player(120, 120, this.playerSheet);
     this.world = new World(this.tileSize, this.tileAtlas);
     this.showMenu(false, "pause");
+    this.showTitles();
     this.dialogue.show(`${this.world.description}`);
   }
 
@@ -657,6 +766,7 @@ class Game {
       console.warn("Save corrupted", error);
     }
     this.showMenu(false, "pause");
+    this.showTitles();
     this.dialogue.show(`${this.world.description}`);
   }
 
@@ -689,9 +799,50 @@ class Game {
     this.showMenu(true, "pause");
   }
 
+  showTitles() {
+    clearTimeout(this.titlesTimer);
+    this.titlesOverlay.classList.add("visible");
+    this.titlesTimer = setTimeout(() => {
+      this.hideTitles();
+    }, 4000);
+  }
+
+  hideTitles() {
+    clearTimeout(this.titlesTimer);
+    this.titlesOverlay.classList.remove("visible");
+  }
+
+  handleAttack(target) {
+    const source = { x: this.player.position.x, y: this.player.position.y };
+    let attackPoint = target;
+    if (!attackPoint) {
+      const nearest = this.enemies
+        .map((enemy) => {
+          const dx = enemy.x - source.x;
+          const dy = enemy.y - source.y;
+          return { enemy, distance: Math.hypot(dx, dy) };
+        })
+        .filter((entry) => entry.distance <= this.attackRadius)
+        .sort((a, b) => a.distance - b.distance)[0];
+      attackPoint = nearest ? { x: nearest.enemy.x, y: nearest.enemy.y } : source;
+    }
+    const dx = attackPoint.x - source.x;
+    const dy = attackPoint.y - source.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > this.attackRadius) {
+      const scale = this.attackRadius / distance;
+      attackPoint = { x: source.x + dx * scale, y: source.y + dy * scale };
+    }
+    this.attackEffects.push({ x: attackPoint.x, y: attackPoint.y, timer: 0 });
+  }
+
   update(delta) {
-    const axis = this.input.getAxis();
+    const axis = this.input.getAxis(this.player.position);
     this.player.update(delta, axis, this.world);
+    this.attackEffects.forEach((effect) => {
+      effect.timer += delta;
+    });
+    this.attackEffects = this.attackEffects.filter((effect) => effect.timer < 0.6);
   }
 
   updateHud() {
@@ -704,8 +855,36 @@ class Game {
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.world.renderBase(this.ctx);
-    this.world.renderDecorations(this.ctx);
+    this.world.renderDecorations(this.ctx, this.lastTimestamp);
+    this.renderAttackRadius();
+    this.renderAttackEffects();
     this.player.render(this.ctx);
+  }
+
+  renderAttackRadius() {
+    const pulse = 0.6 + 0.2 * Math.sin(this.lastTimestamp * 0.006);
+    this.ctx.strokeStyle = `rgba(140, 200, 160, ${pulse})`;
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.arc(
+      Math.round(this.player.position.x),
+      Math.round(this.player.position.y),
+      this.attackRadius,
+      0,
+      Math.PI * 2
+    );
+    this.ctx.stroke();
+  }
+
+  renderAttackEffects() {
+    this.attackEffects.forEach((effect) => {
+      const alpha = 1 - effect.timer / 0.6;
+      const radius = 6 + effect.timer * 20;
+      this.ctx.strokeStyle = `rgba(210, 230, 180, ${alpha})`;
+      this.ctx.beginPath();
+      this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+      this.ctx.stroke();
+    });
   }
 
   gameLoop(timestamp) {
