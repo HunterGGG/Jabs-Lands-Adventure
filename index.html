@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jabs Lands Adventure</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-root">
+    <canvas id="game-canvas" width="640" height="360" aria-label="Jabs Lands Adventure"></canvas>
+
+    <div id="menu" class="overlay visible" role="dialog" aria-label="Main menu">
+      <h1>Jabs Lands Adventure</h1>
+      <div class="menu-buttons">
+        <button id="new-game">New Game</button>
+        <button id="continue">Continue</button>
+        <button id="exit">Exit</button>
+      </div>
+      <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
+    </div>
+
+    <div id="hud" class="overlay">
+      <div class="stat">HP: <span id="hp">0</span></div>
+      <div class="stat">Mana: <span id="mana">0</span></div>
+      <div class="stat">Level: <span id="level">1</span></div>
+      <div class="stat">Coins: <span id="coins">0</span></div>
+    </div>
+
+    <div id="dialogue" class="overlay">
+      <div id="dialogue-text"></div>
+      <div id="dialogue-options"></div>
+    </div>
+
+    <div id="controls" class="overlay">
+      <div id="joystick" class="joystick">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+      <div class="action-buttons">
+        <button id="action-1">Cast</button>
+        <button id="action-2">Interact</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
