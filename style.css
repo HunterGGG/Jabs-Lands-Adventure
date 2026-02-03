@@ -40,6 +40,7 @@ canvas {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 2;
 }
 
 .overlay.visible {
@@ -55,6 +56,7 @@ canvas {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease;
+  z-index: 6;
 }
 
 #menu.visible {
@@ -69,6 +71,14 @@ canvas {
   background: #0d0f16;
   padding: 1.5rem;
   box-shadow: inset 0 0 0 2px #0b0d14, 0 0 20px rgba(5, 7, 12, 0.8);
+}
+
+.menu-section {
+  display: none;
+}
+
+.menu-section.visible {
+  display: block;
 }
 
 .menu-scene {
@@ -275,6 +285,7 @@ button:disabled {
   align-items: flex-end;
   padding: 1rem;
   pointer-events: none;
+  z-index: 3;
 }
 
 .joystick {
@@ -310,6 +321,21 @@ button:disabled {
 #controls button {
   min-width: 90px;
   border-radius: 4px;
+}
+
+.menu-toggle {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 5;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  display: none;
+  pointer-events: auto;
+}
+
+#game-root.state-gameplay .menu-toggle {
+  display: block;
 }
 
 @keyframes flicker {

@@ -22,12 +22,22 @@
           <div class="menu-trees"></div>
         </div>
         <h1 class="menu-title">JABS LANDS ADVENTURE</h1>
-        <div class="menu-buttons">
-          <button id="new-game">New Game</button>
-          <button id="continue">Continue</button>
-          <button id="exit">Exit</button>
+        <div id="menu-main" class="menu-section visible">
+          <div class="menu-buttons">
+            <button id="new-game">New Game</button>
+            <button id="continue">Continue</button>
+            <button id="exit">Exit</button>
+          </div>
+          <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
         </div>
-        <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
+        <div id="menu-pause" class="menu-section">
+          <div class="menu-buttons">
+            <button id="resume">Resume</button>
+            <button id="save-exit">Save &amp; Exit</button>
+            <button id="exit-main">Exit to Main Menu</button>
+          </div>
+          <p class="menu-hint">Тьма замирает, пока жаба отдыхает.</p>
+        </div>
       </div>
     </div>
 
@@ -51,6 +61,8 @@
         </div>
       </div>
     </div>
+
+    <button id="mobile-menu" class="menu-toggle">Menu</button>
 
     <div id="dialogue" class="overlay">
       <div class="dialogue-frame">

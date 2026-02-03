@@ -63,6 +63,26 @@ class SpriteAtlas {
   }
 }
 
+class SpriteSheetLoader {
+  static loadImage(path) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load sprite sheet: ${path}`));
+      image.src = path;
+    });
+  }
+}
+
+// Пример будущего подключения:
+// const playerSheet = await SpriteSheetLoader.loadImage("assets/sprites/jaba-wizard.png");
+// player.animations = {
+//   down: { row: 0, frames: 4 },
+//   up: { row: 1, frames: 4 },
+//   left: { row: 2, frames: 4 },
+//   right: { row: 3, frames: 4 },
+// };
+
 const COLORS = {
   grass1: "#1a2a1f",
   grass2: "#203322",
@@ -469,9 +489,15 @@ class Game {
     this.root = document.getElementById("game-root");
 
     this.menu = document.getElementById("menu");
+    this.menuMain = document.getElementById("menu-main");
+    this.menuPause = document.getElementById("menu-pause");
     this.newGameButton = document.getElementById("new-game");
     this.continueButton = document.getElementById("continue");
     this.exitButton = document.getElementById("exit");
+    this.resumeButton = document.getElementById("resume");
+    this.saveExitButton = document.getElementById("save-exit");
+    this.exitMainButton = document.getElementById("exit-main");
+    this.mobileMenuButton = document.getElementById("mobile-menu");
 
     this.dialogue = new DialogueBox(document.getElementById("dialogue"));
 
@@ -490,10 +516,11 @@ class Game {
     this.player = new Player(120, 120, this.playerSheet);
     this.lastTimestamp = 0;
     this.isRunning = false;
+    this.menuState = "main";
 
     this.bindEvents();
     this.refreshContinueState();
-    this.showMenu(true);
+    this.showMenu(true, "main");
   }
 
   bindEvents() {
@@ -515,6 +542,10 @@ class Game {
     this.newGameButton.addEventListener("click", () => this.startNewGame());
     this.continueButton.addEventListener("click", () => this.loadGame());
     this.exitButton.addEventListener("click", () => this.exitGame());
+    this.resumeButton.addEventListener("click", () => this.resumeGame());
+    this.saveExitButton.addEventListener("click", () => this.saveAndExit());
+    this.exitMainButton.addEventListener("click", () => this.exitToMainMenu());
+    this.mobileMenuButton.addEventListener("click", () => this.togglePauseMenu());
 
     const joystick = document.getElementById("joystick");
     const knob = document.getElementById("joystick-knob");
@@ -577,7 +608,10 @@ class Game {
     this.continueButton.disabled = !save;
   }
 
-  showMenu(visible) {
+  showMenu(visible, state) {
+    this.menuState = state;
+    this.menuMain.classList.toggle("visible", state === "main");
+    this.menuPause.classList.toggle("visible", state === "pause");
     this.menu.classList.toggle("visible", visible);
     this.isRunning = !visible;
     this.root.classList.toggle("state-gameplay", !visible);
@@ -590,13 +624,13 @@ class Game {
   }
 
   toggleMenu() {
-    this.showMenu(!this.menu.classList.contains("visible"));
+    this.togglePauseMenu();
   }
 
   startNewGame() {
     this.player = new Player(120, 120, this.playerSheet);
     this.world = new World(this.tileSize, this.tileAtlas);
-    this.showMenu(false);
+    this.showMenu(false, "pause");
     this.dialogue.show(`${this.world.description}`);
   }
 
@@ -622,13 +656,37 @@ class Game {
     } catch (error) {
       console.warn("Save corrupted", error);
     }
-    this.showMenu(false);
+    this.showMenu(false, "pause");
     this.dialogue.show(`${this.world.description}`);
   }
 
   exitGame() {
+    this.showMenu(true, "main");
+  }
+
+  resumeGame() {
+    this.showMenu(false, "pause");
+  }
+
+  saveAndExit() {
     this.saveGame();
+    this.showMenu(true, "main");
     this.dialogue.show("Сохранение завершено. Возвращайся в сумрак.");
+  }
+
+  exitToMainMenu() {
+    this.showMenu(true, "main");
+  }
+
+  togglePauseMenu() {
+    if (this.menu.classList.contains("visible") && this.menuState === "main") {
+      return;
+    }
+    if (this.menu.classList.contains("visible") && this.menuState === "pause") {
+      this.showMenu(false, "pause");
+      return;
+    }
+    this.showMenu(true, "pause");
   }
 
   update(delta) {
