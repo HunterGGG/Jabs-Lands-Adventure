@@ -5,7 +5,6 @@ class InputManager {
     this.keys = new Set();
     this.pointerActive = false;
     this.joystickVector = { x: 0, y: 0 };
-    this.mouse = { active: false, x: 0, y: 0 };
   }
 
   setKey(key, pressed) {
@@ -16,15 +15,7 @@ class InputManager {
     }
   }
 
-  setMousePosition(x, y) {
-    this.mouse = { active: true, x, y };
-  }
-
-  clearMouse() {
-    this.mouse.active = false;
-  }
-
-  getAxis(playerPosition) {
+  getAxis() {
     let x = 0;
     let y = 0;
     if (this.keys.has("ArrowLeft") || this.keys.has("KeyA")) x -= 1;
@@ -37,51 +28,7 @@ class InputManager {
       y = this.joystickVector.y;
     }
 
-    if (this.mouse.active && playerPosition) {
-      const dx = this.mouse.x - playerPosition.x;
-      const dy = this.mouse.y - playerPosition.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance > 6) {
-        x = dx / distance;
-        y = dy / distance;
-      } else {
-        x = 0;
-        y = 0;
-      }
-    }
-
     return { x, y };
-  }
-}
-
-class SpriteAtlas {
-  constructor(width, height) {
-    this.canvas = document.createElement("canvas");
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.ctx = this.canvas.getContext("2d");
-    this.ctx.imageSmoothingEnabled = false;
-    this.sprites = new Map();
-  }
-
-  add(key, x, y, w, h) {
-    this.sprites.set(key, { x, y, w, h });
-  }
-
-  draw(ctx, key, x, y, scale = 1) {
-    const sprite = this.sprites.get(key);
-    if (!sprite) return;
-    ctx.drawImage(
-      this.canvas,
-      sprite.x,
-      sprite.y,
-      sprite.w,
-      sprite.h,
-      Math.round(x),
-      Math.round(y),
-      sprite.w * scale,
-      sprite.h * scale
-    );
   }
 }
 
@@ -96,6 +43,90 @@ class SpriteSheetLoader {
   }
 }
 
+class TileSet {
+  constructor(image, tileSize, lookup) {
+    this.image = image;
+    this.tileSize = tileSize;
+    this.lookup = lookup;
+  }
+
+  draw(ctx, key, x, y, scale = 1) {
+    const tile = this.lookup[key];
+    if (!tile || !this.image) return;
+    const { col, row } = tile;
+    const size = this.tileSize;
+    ctx.drawImage(
+      this.image,
+      col * size,
+      row * size,
+      size,
+      size,
+      Math.round(x),
+      Math.round(y),
+      size * scale,
+      size * scale
+    );
+  }
+}
+
+class AnimatedSprite {
+  constructor({ image, frameWidth, frameHeight, scale = 1, frameRate = 10 }) {
+    this.image = image;
+    this.frameWidth = frameWidth;
+    this.frameHeight = frameHeight;
+    this.scale = scale;
+    this.frameRate = frameRate;
+    this.frameTimer = 0;
+    this.frame = 0;
+    this.frames = Math.max(1, Math.floor(image.width / frameWidth));
+    this.rows = Math.max(1, Math.floor(image.height / frameHeight));
+  }
+
+  update(delta) {
+    this.frameTimer += delta;
+    if (this.frameTimer >= 1 / this.frameRate) {
+      this.frame = (this.frame + 1) % this.frames;
+      this.frameTimer = 0;
+    }
+  }
+
+  draw(ctx, x, y, row = 0, flip = false) {
+    if (!this.image) return;
+    const sx = this.frame * this.frameWidth;
+    const sy = Math.min(row, this.rows - 1) * this.frameHeight;
+    const drawW = this.frameWidth * this.scale;
+    const drawH = this.frameHeight * this.scale;
+    ctx.save();
+    if (flip) {
+      ctx.scale(-1, 1);
+      ctx.drawImage(
+        this.image,
+        sx,
+        sy,
+        this.frameWidth,
+        this.frameHeight,
+        -Math.round(x + drawW),
+        Math.round(y),
+        drawW,
+        drawH
+      );
+    } else {
+      ctx.drawImage(
+        this.image,
+        sx,
+        sy,
+        this.frameWidth,
+        this.frameHeight,
+        Math.round(x),
+        Math.round(y),
+        drawW,
+        drawH
+      );
+    }
+    ctx.restore();
+  }
+}
+
 // Пример будущего подключения:
 // const playerSheet = await SpriteSheetLoader.loadImage("assets/sprites/jaba-wizard.png");
 // player.animations = {
@@ -105,170 +136,69 @@ class SpriteSheetLoader {
 //   right: { row: 3, frames: 4 },
 // };
 
-const COLORS = {
-  grass1: "#1a2a1f",
-  grass2: "#203322",
-  grass3: "#18261c",
-  grassGlow: "#2e4d2e",
-  path: "#2f2a24",
-  water: "#1a2432",
-  waterHighlight: "#2b3c52",
-  trunk: "#3c2d22",
-  leaf1: "#223424",
-  leaf2: "#2b3f2a",
-  leaf3: "#1a271c",
-  stone: "#3a3f4a",
-  mushroom: "#5b2d3a",
-  shadow: "#0d0f16",
-  robe: "#5b7d4a",
-  hat: "#3a2d52",
-  staff: "#4a3b2e",
-  frog: "#7fd36b",
-  frogDark: "#4f8b4a",
-  eyes: "#121815",
-  glow: "#8fd27a",
+const TILE_LOOKUP = {
+  "grass-1": { col: 0, row: 0 },
+  "grass-2": { col: 1, row: 0 },
+  "grass-3": { col: 2, row: 0 },
+  "grass-dark": { col: 3, row: 0 },
+  path: { col: 4, row: 0 },
+  mud: { col: 5, row: 0 },
+  "grass-edge": { col: 6, row: 0 },
 };
 
-function buildTileAtlas() {
-  const size = 16;
-  const atlas = new SpriteAtlas(size * 4, size * 3);
-  const ctx = atlas.ctx;
+const ASSET_MANIFEST = {
+  tilemap: "assets/Tiny Swords (Free Pack)/Terrain/Tileset/Tilemap_color2.png",
+  waterTile: "assets/Tiny Swords (Free Pack)/Terrain/Tileset/Water Background color.png",
+  waterFoam: "assets/Tiny Swords (Free Pack)/Terrain/Tileset/Water Foam.png",
+  bush1: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Bushes/Bushe1.png",
+  bush2: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Bushes/Bushe2.png",
+  bush3: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Bushes/Bushe3.png",
+  bush4: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Bushes/Bushe4.png",
+  rock1: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rocks/Rock1.png",
+  rock2: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rocks/Rock2.png",
+  rock3: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rocks/Rock3.png",
+  rock4: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rocks/Rock4.png",
+  waterRock: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rocks in the Water/Water Rocks_02.png",
+  rubberDuck: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Rubber Duck/Rubber duck.png",
+  cloud1: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Clouds/Clouds_01.png",
+  cloud2: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Clouds/Clouds_02.png",
+  cloud3: "assets/Tiny Swords (Free Pack)/Terrain/Decorations/Clouds/Clouds_03.png",
+  house: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/House1.png",
+  house2: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/House2.png",
+  tower: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/Tower.png",
+  barracks: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/Barracks.png",
+  castle: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/Castle.png",
+  archery: "assets/Tiny Swords (Free Pack)/Buildings/Yellow Buildings/Archery.png",
+  enemyArcher: "assets/Tiny Swords (Free Pack)/Units/Red Units/Archer/Archer_Idle.png",
+  enemyLancer: "assets/Tiny Swords (Free Pack)/Units/Red Units/Lancer/Lancer_Idle.png",
+  playerIdle: "assets/Tiny Swords (Free Pack)/Units/Blue Units/Monk/Idle.png",
+  playerRun: "assets/Tiny Swords (Free Pack)/Units/Blue Units/Monk/Run.png",
+  playerCast: "assets/Tiny Swords (Free Pack)/Units/Blue Units/Monk/Heal.png",
+  castEffect: "assets/Tiny Swords (Free Pack)/Units/Blue Units/Monk/Heal_Effect.png",
+  explosion: "assets/Tiny Swords (Free Pack)/Particle FX/Explosion_02.png",
+  cursor: "assets/Tiny Swords (Free Pack)/UI Elements/UI Elements/Cursors/Cursor_04.png",
+};
 
-  const drawGrass = (x, y, base, accent) => {
-    ctx.fillStyle = base;
-    ctx.fillRect(x, y, size, size);
-    ctx.fillStyle = accent;
-    ctx.fillRect(x + 2, y + 3, 2, 2);
-    ctx.fillRect(x + 10, y + 7, 2, 2);
-    ctx.fillRect(x + 6, y + 12, 2, 2);
-  };
-
-  drawGrass(0, 0, COLORS.grass1, COLORS.grassGlow);
-  atlas.add("grass-1", 0, 0, size, size);
-
-  drawGrass(size, 0, COLORS.grass2, COLORS.grassGlow);
-  atlas.add("grass-2", size, 0, size, size);
-
-  drawGrass(size * 2, 0, COLORS.grass3, COLORS.grassGlow);
-  atlas.add("grass-3", size * 2, 0, size, size);
-
-  ctx.fillStyle = COLORS.path;
-  ctx.fillRect(size * 3, 0, size, size);
-  ctx.fillStyle = "#41362c";
-  ctx.fillRect(size * 3 + 3, 3, 4, 4);
-  ctx.fillRect(size * 3 + 9, 8, 3, 3);
-  atlas.add("path", size * 3, 0, size, size);
-
-  ctx.fillStyle = COLORS.water;
-  ctx.fillRect(0, size, size, size);
-  ctx.fillStyle = COLORS.waterHighlight;
-  ctx.fillRect(2, size + 3, 6, 2);
-  ctx.fillRect(9, size + 9, 5, 2);
-  atlas.add("water", 0, size, size, size);
-
-  ctx.fillStyle = COLORS.grass2;
-  ctx.fillRect(size, size, size, size);
-  ctx.fillStyle = COLORS.grass3;
-  ctx.fillRect(size + 6, size + 5, 4, 6);
-  ctx.fillRect(size + 2, size + 11, 3, 3);
-  atlas.add("grass-dark", size, size, size, size);
-
-  ctx.fillStyle = COLORS.grass1;
-  ctx.fillRect(size * 2, size, size, size);
-  ctx.fillStyle = COLORS.glow;
-  ctx.fillRect(size * 2 + 4, size + 4, 3, 3);
-  ctx.fillRect(size * 2 + 10, size + 9, 2, 2);
-  atlas.add("grass-glow", size * 2, size, size, size);
-
-  ctx.fillStyle = COLORS.path;
-  ctx.fillRect(size * 3, size, size, size);
-  ctx.fillStyle = "#2a2020";
-  ctx.fillRect(size * 3 + 5, size + 6, 6, 4);
-  atlas.add("mud", size * 3, size, size, size);
-
-  return atlas;
-}
-
-function buildPlayerSpriteSheet() {
-  const frameWidth = 16;
-  const frameHeight = 24;
-  const frames = 4;
-  const directions = 4;
-  const canvas = document.createElement("canvas");
-  canvas.width = frameWidth * frames;
-  canvas.height = frameHeight * directions;
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-
-  const drawFrame = (frame, dir) => {
-    const x = frame * frameWidth;
-    const y = dir * frameHeight;
-
-    ctx.clearRect(x, y, frameWidth, frameHeight);
-    ctx.fillStyle = COLORS.shadow;
-    ctx.fillRect(x + 4, y + 20, 8, 3);
-
-    ctx.fillStyle = COLORS.robe;
-    ctx.fillRect(x + 3, y + 8, 10, 12);
-
-    ctx.fillStyle = COLORS.frog;
-    ctx.fillRect(x + 4, y + 4, 8, 6);
-
-    ctx.fillStyle = COLORS.hat;
-    ctx.fillRect(x + 2, y + 1, 12, 4);
-    ctx.fillRect(x + 5, y + 0, 6, 2);
-
-    ctx.fillStyle = COLORS.staff;
-    ctx.fillRect(x + 12, y + 6, 2, 14);
-
-    ctx.fillStyle = COLORS.frogDark;
-    ctx.fillRect(x + 4, y + 10, 2, 4);
-    ctx.fillRect(x + 9, y + 10, 2, 4);
-
-    if (dir === 0) {
-      ctx.fillStyle = COLORS.eyes;
-      ctx.fillRect(x + 5, y + 6, 2, 2);
-      ctx.fillRect(x + 9, y + 6, 2, 2);
-    }
-
-    const step = frame % 2 === 0 ? 0 : 1;
-    ctx.fillStyle = COLORS.robe;
-    ctx.fillRect(x + 3, y + 18 + step, 4, 4);
-    ctx.fillRect(x + 9, y + 18 - step, 4, 4);
-
-    if (dir === 1) {
-      ctx.fillStyle = COLORS.eyes;
-      ctx.fillRect(x + 5, y + 6, 2, 2);
-    }
-    if (dir === 2) {
-      ctx.fillStyle = COLORS.eyes;
-      ctx.fillRect(x + 9, y + 6, 2, 2);
-    }
-  };
-
-  for (let dir = 0; dir < directions; dir += 1) {
-    for (let frame = 0; frame < frames; frame += 1) {
-      drawFrame(frame, dir);
-    }
-  }
-
-  return {
-    image: canvas,
-    frameWidth,
-    frameHeight,
-    frames,
-  };
-}
+const loadAssets = () => {
+  const entries = Object.entries(ASSET_MANIFEST);
+  return Promise.all(
+    entries.map(([key, path]) =>
+      SpriteSheetLoader.loadImage(path).then((image) => [key, image])
+    )
+  ).then((loaded) => Object.fromEntries(loaded));
+};
 
 class Player {
-  constructor(x, y, spriteSheet) {
+  constructor(x, y, animations) {
     this.position = { x, y };
-    this.speed = 90;
-    this.size = 16;
+    this.speed = 140;
+    this.size = 24;
     this.direction = 0;
-    this.frame = 0;
-    this.frameTimer = 0;
-    this.spriteSheet = spriteSheet;
+    this.animations = animations;
+    this.activeAnimation = "idle";
+    this.lastAnimation = "idle";
+    this.castTimer = 0;
+    this.flip = false;
     this.stats = {
       hp: 100,
       mana: 60,
@@ -278,6 +208,21 @@ class Player {
     };
   }
 
+  setCast() {
+    this.castTimer = 0.4;
+    this.setAnimation("cast");
+  }
+
+  setAnimation(name) {
+    if (this.activeAnimation === name) return;
+    this.activeAnimation = name;
+    const animation = this.animations[name];
+    if (animation) {
+      animation.frame = 0;
+      animation.frameTimer = 0;
+    }
+  }
+
   update(delta, axis, world) {
     const norm = Math.hypot(axis.x, axis.y) || 1;
     const velocity = {
@@ -285,21 +230,29 @@ class Player {
       y: (axis.y / norm) * this.speed,
     };
 
-    if (axis.x !== 0 || axis.y !== 0) {
+    const isMoving = axis.x !== 0 || axis.y !== 0;
+    if (isMoving) {
       if (Math.abs(axis.x) > Math.abs(axis.y)) {
-        this.direction = axis.x > 0 ? 2 : 1;
+        this.direction = 1;
+        this.flip = axis.x < 0;
       } else {
-        this.direction = axis.y > 0 ? 0 : 3;
+        this.direction = axis.y > 0 ? 0 : 2;
+        this.flip = false;
       }
+    }
 
-      this.frameTimer += delta;
-      if (this.frameTimer > 0.18) {
-        this.frame = (this.frame + 1) % this.spriteSheet.frames;
-        this.frameTimer = 0;
+    if (this.castTimer > 0) {
+      this.castTimer = Math.max(0, this.castTimer - delta);
+      if (this.castTimer === 0) {
+        this.setAnimation("idle");
       }
     } else {
-      this.frame = 0;
-      this.frameTimer = 0;
+      this.setAnimation(isMoving ? "run" : "idle");
+    }
+
+    const animation = this.animations[this.activeAnimation];
+    if (animation) {
+      animation.update(delta);
     }
 
     const nextX = this.position.x + velocity.x * delta;
@@ -314,27 +267,56 @@ class Player {
   }
 
   render(ctx) {
-    const { frameWidth, frameHeight, frames, image } = this.spriteSheet;
-    const frame = this.frame;
-    const sx = frame * frameWidth;
-    const sy = this.direction * frameHeight;
-    const drawX = Math.round(this.position.x - frameWidth / 2);
-    const drawY = Math.round(this.position.y - frameHeight + 4);
-    ctx.drawImage(image, sx, sy, frameWidth, frameHeight, drawX, drawY, frameWidth, frameHeight);
+    const animation = this.animations[this.activeAnimation];
+    if (!animation) return;
+    const drawX = Math.round(this.position.x - (animation.frameWidth * animation.scale) / 2);
+    const drawY = Math.round(this.position.y - animation.frameHeight * animation.scale + 6);
+    animation.draw(ctx, drawX, drawY, this.direction, this.flip);
+  }
+}
+
+class Enemy {
+  constructor(x, y, sprite, hp = 24) {
+    this.position = { x, y };
+    this.sprite = sprite;
+    this.hp = hp;
+    this.radius = 18;
+    this.direction = 0;
+    this.flip = false;
+  }
+
+  update(delta) {
+    this.sprite.update(delta);
+  }
+
+  takeDamage(amount) {
+    this.hp = Math.max(0, this.hp - amount);
+  }
+
+  isDead() {
+    return this.hp <= 0;
+  }
+
+  render(ctx) {
+    const drawX = Math.round(this.position.x - (this.sprite.frameWidth * this.sprite.scale) / 2);
+    const drawY = Math.round(this.position.y - this.sprite.frameHeight * this.sprite.scale + 10);
+    this.sprite.draw(ctx, drawX, drawY, this.direction, this.flip);
   }
 }
 
 class World {
-  constructor(tileSize, atlas) {
+  constructor(tileSize, tileset, assets) {
     this.tileSize = tileSize;
-    this.width = 40;
-    this.height = 22;
+    this.width = 20;
+    this.height = 12;
     this.biome = "Dark Forest";
     this.description = "Лес шепчет, а мох пьёт лунный свет.";
-    this.atlas = atlas;
+    this.tileset = tileset;
+    this.assets = assets;
     this.tiles = this.generateTiles();
     this.decorations = this.generateDecorations();
     this.blockers = this.generateBlockers();
+    this.clouds = this.generateClouds();
   }
 
   generateTiles() {
@@ -355,63 +337,76 @@ class World {
       tiles.push(row);
     }
 
-    for (let x = 6; x < 16; x += 1) {
-      tiles[10][x] = "path";
-      tiles[11][x] = "mud";
+    for (let x = 3; x < 17; x += 1) {
+      tiles[7][x] = "path";
+    }
+    for (let y = 2; y < 10; y += 1) {
+      tiles[y][9] = "path";
+    }
+    for (let x = 6; x < 13; x += 1) {
+      tiles[8][x] = "mud";
     }
 
-    tiles[14][18] = "water";
-    tiles[14][19] = "water";
-    tiles[15][18] = "water";
-    tiles[15][19] = "water";
+    const waterCells = [
+      [15, 3],
+      [16, 3],
+      [14, 4],
+      [15, 4],
+      [16, 4],
+      [14, 5],
+      [15, 5],
+      [16, 5],
+      [15, 6],
+    ];
+    waterCells.forEach(([x, y]) => {
+      tiles[y][x] = "water";
+    });
 
     return tiles;
   }
 
   generateDecorations() {
     return [
-      { type: "tree", x: 4, y: 4 },
-      { type: "tree", x: 10, y: 3 },
-      { type: "tree", x: 20, y: 5 },
-      { type: "tree", x: 30, y: 4 },
-      { type: "tree", x: 34, y: 12 },
-      { type: "tree", x: 8, y: 14 },
-      { type: "rock", x: 15, y: 7 },
-      { type: "rock", x: 22, y: 9 },
-      { type: "mushroom", x: 12, y: 12 },
-      { type: "mushroom", x: 26, y: 15 },
-      { type: "stump", x: 18, y: 6 },
-      { type: "bush", x: 6, y: 9 },
-      { type: "bush", x: 28, y: 8 },
-      { type: "glow", x: 24, y: 4 },
-      { type: "torch", x: 14, y: 14 },
-      { type: "torch", x: 32, y: 16 },
-      { type: "fallen-log", x: 21, y: 12 },
-      { type: "fallen-log", x: 9, y: 6 },
+      { type: "house", x: 4, y: 8, imageKey: "house", scale: 0.5, block: { w: 70, h: 40 } },
+      { type: "house", x: 6, y: 8, imageKey: "house2", scale: 0.5, block: { w: 70, h: 40 } },
+      { type: "barracks", x: 2, y: 6, imageKey: "barracks", scale: 0.48, block: { w: 90, h: 50 } },
+      { type: "archery", x: 8, y: 6, imageKey: "archery", scale: 0.48, block: { w: 80, h: 50 } },
+      { type: "tower", x: 12, y: 5, imageKey: "tower", scale: 0.5, block: { w: 60, h: 60 } },
+      { type: "castle", x: 10, y: 8, imageKey: "castle", scale: 0.45, block: { w: 110, h: 70 } },
+      { type: "bush", x: 1, y: 2, imageKey: "bush1", scale: 0.6 },
+      { type: "bush", x: 3, y: 2, imageKey: "bush2", scale: 0.6 },
+      { type: "bush", x: 5, y: 2, imageKey: "bush3", scale: 0.6 },
+      { type: "bush", x: 7, y: 2, imageKey: "bush4", scale: 0.6 },
+      { type: "rock", x: 14, y: 2, imageKey: "rock1", scale: 0.55 },
+      { type: "rock", x: 16, y: 2, imageKey: "rock2", scale: 0.55 },
+      { type: "rock", x: 1, y: 10, imageKey: "rock3", scale: 0.55 },
+      { type: "rock", x: 3, y: 10, imageKey: "rock4", scale: 0.55 },
+      { type: "duck", x: 15, y: 5, imageKey: "rubberDuck", scale: 0.5 },
+      { type: "water-rock", x: 14, y: 6, imageKey: "waterRock", scale: 0.5 },
+    ];
+  }
+
+  generateClouds() {
+    return [
+      { x: 40, y: 10, imageKey: "cloud1", scale: 0.5, speed: 4 },
+      { x: 260, y: 18, imageKey: "cloud2", scale: 0.45, speed: 5 },
+      { x: 420, y: 6, imageKey: "cloud3", scale: 0.55, speed: 3 },
     ];
   }
 
   generateBlockers() {
     return this.decorations
-      .filter((decor) => ["tree", "rock", "stump", "bush", "fallen-log"].includes(decor.type))
+      .filter((decor) => ["bush", "rock", "house", "barracks", "tower", "archery", "castle"].includes(decor.type))
       .map((decor) => {
         const base = { x: decor.x * this.tileSize, y: decor.y * this.tileSize };
-        switch (decor.type) {
-          case "tree":
-            return { x: base.x + 8, y: base.y + 14, w: 8, h: 10 };
-          case "rock":
-            return { x: base.x + 4, y: base.y + 8, w: 12, h: 8 };
-          case "stump":
-            return { x: base.x + 6, y: base.y + 10, w: 10, h: 6 };
-          case "bush":
-            return { x: base.x + 4, y: base.y + 10, w: 12, h: 6 };
-          case "fallen-log":
-            return { x: base.x + 2, y: base.y + 10, w: 28, h: 6 };
-          default:
-            return null;
-        }
-      })
-      .filter(Boolean);
+        const block = decor.block || { w: 32, h: 20 };
+        return {
+          x: base.x + this.tileSize * 0.2,
+          y: base.y + this.tileSize * 0.6,
+          w: block.w,
+          h: block.h,
+        };
+      });
   }
 
   isBlocked(x, y, size) {
@@ -440,92 +435,76 @@ class World {
     });
   }
 
-  renderBase(ctx) {
+  renderBase(ctx, time = 0) {
     for (let y = 0; y < this.height; y += 1) {
       for (let x = 0; x < this.width; x += 1) {
         const tile = this.tiles[y][x];
-        this.atlas.draw(ctx, tile, x * this.tileSize, y * this.tileSize);
+        if (tile === "water") {
+          const water = this.assets.waterTile;
+          if (water) {
+            ctx.drawImage(
+              water,
+              0,
+              0,
+              water.width,
+              water.height,
+              x * this.tileSize,
+              y * this.tileSize,
+              this.tileSize,
+              this.tileSize
+            );
+            const foam = this.assets.waterFoam;
+            if (foam) {
+              const frameWidth = 64;
+              const frameHeight = 64;
+              const frames = Math.floor(foam.width / frameWidth);
+              const frame = Math.floor((time / 120) % frames);
+              ctx.drawImage(
+                foam,
+                frame * frameWidth,
+                0,
+                frameWidth,
+                frameHeight,
+                x * this.tileSize,
+                y * this.tileSize,
+                this.tileSize,
+                this.tileSize
+              );
+            }
+            continue;
+          }
+        }
+        this.tileset.draw(ctx, tile, x * this.tileSize, y * this.tileSize);
       }
     }
   }
 
   renderDecorations(ctx, time = 0) {
-    const flicker = Math.sin(time * 0.005);
     this.decorations.forEach((decor) => {
+      const image = this.assets[decor.imageKey];
+      if (!image) return;
       const x = decor.x * this.tileSize;
       const y = decor.y * this.tileSize;
+      const scale = decor.scale || 1;
+      const drawW = image.width * scale;
+      const drawH = image.height * scale;
+      const anchorX = drawW / 2;
+      const anchorY = drawH;
+      ctx.drawImage(image, x + this.tileSize / 2 - anchorX, y + this.tileSize - anchorY, drawW, drawH);
+    });
+  }
 
-      switch (decor.type) {
-        case "tree":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 4, y + 20, 16, 6);
-          ctx.fillStyle = COLORS.trunk;
-          ctx.fillRect(x + 10, y + 14, 6, 12);
-          ctx.fillStyle = COLORS.leaf2;
-          ctx.fillRect(x + 2, y, 22, 16);
-          ctx.fillStyle = COLORS.leaf1;
-          ctx.fillRect(x + 5, y + 4, 16, 10);
-          ctx.fillStyle = COLORS.leaf3;
-          ctx.fillRect(x + 8, y + 2, 10, 8);
-          break;
-        case "rock":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 4, y + 12, 10, 4);
-          ctx.fillStyle = COLORS.stone;
-          ctx.fillRect(x + 5, y + 6, 12, 8);
-          break;
-        case "mushroom":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 5, y + 13, 8, 3);
-          ctx.fillStyle = COLORS.mushroom;
-          ctx.fillRect(x + 4, y + 7, 10, 6);
-          ctx.fillStyle = COLORS.leaf1;
-          ctx.fillRect(x + 7, y + 10, 4, 4);
-          break;
-        case "stump":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 6, y + 14, 8, 3);
-          ctx.fillStyle = COLORS.trunk;
-          ctx.fillRect(x + 6, y + 8, 10, 8);
-          ctx.fillStyle = "#624d3a";
-          ctx.fillRect(x + 8, y + 10, 4, 4);
-          break;
-        case "bush":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 4, y + 12, 12, 4);
-          ctx.fillStyle = COLORS.leaf2;
-          ctx.fillRect(x + 3, y + 6, 14, 8);
-          ctx.fillStyle = COLORS.leaf1;
-          ctx.fillRect(x + 6, y + 8, 8, 5);
-          break;
-        case "glow":
-          ctx.fillStyle = COLORS.glow;
-          ctx.fillRect(x + 7, y + 6, 4, 4);
-          ctx.fillStyle = `rgba(130, 210, 120, ${0.35 + 0.15 * (flicker + 1)})`;
-          ctx.fillRect(x + 4, y + 3, 10, 10);
-          break;
-        case "torch": {
-          const torchGlow = 0.6 + 0.3 * flicker;
-          ctx.fillStyle = COLORS.trunk;
-          ctx.fillRect(x + 7, y + 10, 2, 8);
-          ctx.fillStyle = "#bb5b4b";
-          ctx.fillRect(x + 5, y + 6, 6, 5);
-          ctx.fillStyle = `rgba(230, 200, 120, ${torchGlow})`;
-          ctx.fillRect(x + 3, y + 4, 10, 8);
-          break;
-        }
-        case "fallen-log":
-          ctx.fillStyle = COLORS.shadow;
-          ctx.fillRect(x + 2, y + 14, 26, 4);
-          ctx.fillStyle = COLORS.trunk;
-          ctx.fillRect(x + 2, y + 10, 26, 6);
-          ctx.fillStyle = "#6b533c";
-          ctx.fillRect(x + 6, y + 12, 4, 2);
-          ctx.fillRect(x + 16, y + 12, 4, 2);
-          break;
-        default:
-          break;
-      }
+  renderClouds(ctx, time = 0) {
+    this.clouds.forEach((cloud) => {
+      const image = this.assets[cloud.imageKey];
+      if (!image) return;
+      const offsetX = (time * 0.01 * cloud.speed) % (this.tileSize * this.width + image.width);
+      const x = cloud.x + offsetX - image.width;
+      const drawW = image.width * cloud.scale;
+      const drawH = image.height * cloud.scale;
+      ctx.globalAlpha = 0.7;
+      ctx.drawImage(image, x, cloud.y, drawW, drawH);
+      ctx.globalAlpha = 1;
     });
   }
 }
@@ -560,11 +539,12 @@ class DialogueBox {
 }
 
 class Game {
-  constructor() {
+  constructor(assets) {
     this.canvas = document.getElementById("game-canvas");
     this.ctx = this.canvas.getContext("2d");
     this.ctx.imageSmoothingEnabled = false;
     this.root = document.getElementById("game-root");
+    this.assets = assets;
 
     this.menu = document.getElementById("menu");
     this.menuMain = document.getElementById("menu-main");
@@ -589,18 +569,23 @@ class Game {
     };
 
     this.input = new InputManager();
-    this.tileSize = 16;
-    this.tileAtlas = buildTileAtlas();
-    this.playerSheet = buildPlayerSpriteSheet();
-    this.world = new World(this.tileSize, this.tileAtlas);
-    this.player = new Player(120, 120, this.playerSheet);
+    this.tileSize = 32;
+    this.tileset = new TileSet(this.assets.tilemap, this.tileSize, TILE_LOOKUP);
+    this.playerAnimations = this.createPlayerAnimations();
+    this.world = new World(this.tileSize, this.tileset, this.assets);
+    this.player = new Player(this.tileSize * 4, this.tileSize * 4, this.playerAnimations);
     this.lastTimestamp = 0;
     this.isRunning = false;
     this.menuState = "main";
-    this.attackRadius = 48;
+    this.attackRadius = 96;
+    this.attackCooldown = 0.45;
+    this.attackTimer = 0;
     this.attackEffects = [];
     this.titlesTimer = null;
-    this.enemies = [];
+    this.enemies = this.spawnEnemies();
+    this.moveTarget = null;
+    this.attackTarget = null;
+    this.commandMarker = null;
 
     this.bindEvents();
     this.refreshContinueState();
@@ -632,27 +617,10 @@ class Game {
     this.mobileMenuButton.addEventListener("click", () => this.togglePauseMenu());
     this.skipTitlesButton.addEventListener("click", () => this.hideTitles());
 
-    this.canvas.addEventListener("mousemove", (event) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.canvas.width / rect.width;
-      const scaleY = this.canvas.height / rect.height;
-      const x = (event.clientX - rect.left) * scaleX;
-      const y = (event.clientY - rect.top) * scaleY;
-      this.input.setMousePosition(x, y);
-    });
-
-    this.canvas.addEventListener("mouseleave", () => {
-      this.input.clearMouse();
-    });
-
     this.canvas.addEventListener("click", (event) => {
       if (!this.isRunning) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.canvas.width / rect.width;
-      const scaleY = this.canvas.height / rect.height;
-      const x = (event.clientX - rect.left) * scaleX;
-      const y = (event.clientY - rect.top) * scaleY;
-      this.handleAttack({ x, y });
+      const { x, y } = this.getPointerPosition(event);
+      this.handlePointerAction({ x, y });
     });
 
     const joystick = document.getElementById("joystick");
@@ -697,7 +665,11 @@ class Game {
     joystick.addEventListener("pointercancel", releaseJoystick);
 
     document.getElementById("action-1").addEventListener("click", () => {
-      this.handleAttack();
+      const nearest = this.getNearestEnemy();
+      if (nearest) {
+        this.attackTarget = nearest;
+        this.moveTarget = { ...nearest.position };
+      }
     });
 
     document.getElementById("action-2").addEventListener("click", () => {
@@ -736,8 +708,9 @@ class Game {
   }
 
   startNewGame() {
-    this.player = new Player(120, 120, this.playerSheet);
-    this.world = new World(this.tileSize, this.tileAtlas);
+    this.player = new Player(this.tileSize * 4, this.tileSize * 4, this.playerAnimations);
+    this.world = new World(this.tileSize, this.tileset, this.assets);
+    this.enemies = this.spawnEnemies();
     this.showMenu(false, "pause");
     this.showTitles();
     this.dialogue.show(`${this.world.description}`);
@@ -758,9 +731,9 @@ class Game {
     if (!data) return;
     try {
       const payload = JSON.parse(data);
-      this.player = new Player(payload.player.x, payload.player.y, this.playerSheet);
+      this.player = new Player(payload.player.x, payload.player.y, this.playerAnimations);
       this.player.stats = payload.stats;
-      this.world = new World(this.tileSize, this.tileAtlas);
+      this.world = new World(this.tileSize, this.tileset, this.assets);
       this.world.biome = payload.biome || this.world.biome;
     } catch (error) {
       console.warn("Save corrupted", error);
@@ -812,37 +785,163 @@ class Game {
     this.titlesOverlay.classList.remove("visible");
   }
 
-  handleAttack(target) {
-    const source = { x: this.player.position.x, y: this.player.position.y };
-    let attackPoint = target;
-    if (!attackPoint) {
-      const nearest = this.enemies
-        .map((enemy) => {
-          const dx = enemy.x - source.x;
-          const dy = enemy.y - source.y;
-          return { enemy, distance: Math.hypot(dx, dy) };
-        })
-        .filter((entry) => entry.distance <= this.attackRadius)
-        .sort((a, b) => a.distance - b.distance)[0];
-      attackPoint = nearest ? { x: nearest.enemy.x, y: nearest.enemy.y } : source;
+  createPlayerAnimations() {
+    const frameWidth = 64;
+    const frameHeight = 64;
+    return {
+      idle: new AnimatedSprite({
+        image: this.assets.playerIdle,
+        frameWidth,
+        frameHeight,
+        scale: 0.55,
+        frameRate: 8,
+      }),
+      run: new AnimatedSprite({
+        image: this.assets.playerRun,
+        frameWidth,
+        frameHeight,
+        scale: 0.55,
+        frameRate: 10,
+      }),
+      cast: new AnimatedSprite({
+        image: this.assets.playerCast,
+        frameWidth,
+        frameHeight,
+        scale: 0.55,
+        frameRate: 10,
+      }),
+    };
+  }
+
+  createEnemySprite(image, scale = 0.55) {
+    return new AnimatedSprite({
+      image,
+      frameWidth: 64,
+      frameHeight: 64,
+      scale,
+      frameRate: 8,
+    });
+  }
+
+  spawnEnemies() {
+    return [
+      new Enemy(this.tileSize * 16, this.tileSize * 2, this.createEnemySprite(this.assets.enemyArcher)),
+      new Enemy(this.tileSize * 17, this.tileSize * 7, this.createEnemySprite(this.assets.enemyLancer, 0.6), 36),
+      new Enemy(this.tileSize * 3, this.tileSize * 4, this.createEnemySprite(this.assets.enemyArcher), 28),
+    ];
+  }
+
+  getPointerPosition(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+    return { x, y };
+  }
+
+  getEnemyAt(x, y) {
+    return this.enemies.find((enemy) => {
+      if (enemy.isDead()) return false;
+      const dx = enemy.position.x - x;
+      const dy = enemy.position.y - y;
+      return Math.hypot(dx, dy) <= enemy.radius;
+    });
+  }
+
+  getNearestEnemy() {
+    const source = this.player.position;
+    return this.enemies
+      .filter((enemy) => !enemy.isDead())
+      .map((enemy) => {
+        const dx = enemy.position.x - source.x;
+        const dy = enemy.position.y - source.y;
+        return { enemy, distance: Math.hypot(dx, dy) };
+      })
+      .sort((a, b) => a.distance - b.distance)[0]?.enemy;
+  }
+
+  handlePointerAction(target) {
+    const enemy = this.getEnemyAt(target.x, target.y);
+    if (enemy) {
+      this.attackTarget = enemy;
+      this.moveTarget = { ...enemy.position };
+      this.commandMarker = { x: enemy.position.x, y: enemy.position.y, type: "attack", timer: 0 };
+      return;
     }
-    const dx = attackPoint.x - source.x;
-    const dy = attackPoint.y - source.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance > this.attackRadius) {
-      const scale = this.attackRadius / distance;
-      attackPoint = { x: source.x + dx * scale, y: source.y + dy * scale };
+    this.attackTarget = null;
+    this.moveTarget = { x: target.x, y: target.y };
+    this.commandMarker = { x: target.x, y: target.y, type: "move", timer: 0 };
+  }
+
+  canAttack() {
+    return this.attackTimer <= 0;
+  }
+
+  performAttack(enemy) {
+    const target = enemy.position;
+    this.attackEffects.push({
+      x: target.x,
+      y: target.y,
+      timer: 0,
+      imageKey: "explosion",
+    });
+    this.attackTimer = this.attackCooldown;
+    this.player.setCast();
+    enemy.takeDamage(this.player.stats.spellPower);
+    if (enemy.isDead()) {
+      this.player.stats.coins += 1;
     }
-    this.attackEffects.push({ x: attackPoint.x, y: attackPoint.y, timer: 0 });
+    this.attackTarget = null;
+    this.moveTarget = null;
   }
 
   update(delta) {
-    const axis = this.input.getAxis(this.player.position);
-    this.player.update(delta, axis, this.world);
+    this.attackTimer = Math.max(0, this.attackTimer - delta);
+    const axis = this.input.getAxis();
+    let movement = axis;
+    if (axis.x !== 0 || axis.y !== 0) {
+      this.moveTarget = null;
+    } else if (this.moveTarget) {
+      const dx = this.moveTarget.x - this.player.position.x;
+      const dy = this.moveTarget.y - this.player.position.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 4) {
+        this.moveTarget = null;
+        movement = { x: 0, y: 0 };
+      } else {
+        movement = { x: dx / distance, y: dy / distance };
+      }
+    }
+
+    this.player.update(delta, movement, this.world);
+    this.enemies.forEach((enemy) => enemy.update(delta));
+
+    if (this.attackTarget && this.attackTarget.isDead()) {
+      this.attackTarget = null;
+    }
+
+    if (this.attackTarget && !this.attackTarget.isDead()) {
+      const dx = this.attackTarget.position.x - this.player.position.x;
+      const dy = this.attackTarget.position.y - this.player.position.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > this.attackRadius) {
+        this.moveTarget = { ...this.attackTarget.position };
+      } else if (this.canAttack()) {
+        this.performAttack(this.attackTarget);
+      }
+    }
+
     this.attackEffects.forEach((effect) => {
       effect.timer += delta;
     });
     this.attackEffects = this.attackEffects.filter((effect) => effect.timer < 0.6);
+    if (this.commandMarker) {
+      this.commandMarker.timer += delta;
+      if (this.commandMarker.timer > 0.8) {
+        this.commandMarker = null;
+      }
+    }
   }
 
   updateHud() {
@@ -854,11 +953,19 @@ class Game {
 
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.world.renderBase(this.ctx);
+    this.world.renderBase(this.ctx, this.lastTimestamp);
+    this.world.renderClouds(this.ctx, this.lastTimestamp);
     this.world.renderDecorations(this.ctx, this.lastTimestamp);
+    this.renderCommandMarker();
+    this.enemies.forEach((enemy) => {
+      if (!enemy.isDead()) {
+        enemy.render(this.ctx);
+      }
+    });
     this.renderAttackRadius();
     this.renderAttackEffects();
     this.player.render(this.ctx);
+    this.renderCastEffect();
   }
 
   renderAttackRadius() {
@@ -880,11 +987,52 @@ class Game {
     this.attackEffects.forEach((effect) => {
       const alpha = 1 - effect.timer / 0.6;
       const radius = 6 + effect.timer * 20;
-      this.ctx.strokeStyle = `rgba(210, 230, 180, ${alpha})`;
-      this.ctx.beginPath();
-      this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
-      this.ctx.stroke();
+      const image = this.assets[effect.imageKey];
+      if (image) {
+        const size = 64 + effect.timer * 50;
+        this.ctx.globalAlpha = alpha;
+        this.ctx.drawImage(image, effect.x - size / 2, effect.y - size / 2, size, size);
+        this.ctx.globalAlpha = 1;
+      } else {
+        this.ctx.strokeStyle = `rgba(210, 230, 180, ${alpha})`;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
     });
+  }
+
+  renderCommandMarker() {
+    if (!this.commandMarker) return;
+    const image = this.assets.cursor;
+    if (!image) return;
+    const alpha = 1 - this.commandMarker.timer / 0.8;
+    const size = 32;
+    this.ctx.globalAlpha = alpha;
+    this.ctx.drawImage(
+      image,
+      this.commandMarker.x - size / 2,
+      this.commandMarker.y - size / 2,
+      size,
+      size
+    );
+    this.ctx.globalAlpha = 1;
+  }
+
+  renderCastEffect() {
+    if (this.player.castTimer <= 0) return;
+    const image = this.assets.castEffect;
+    if (!image) return;
+    const size = 64;
+    this.ctx.globalAlpha = 0.7;
+    this.ctx.drawImage(
+      image,
+      this.player.position.x - size / 2,
+      this.player.position.y - size / 2,
+      size,
+      size
+    );
+    this.ctx.globalAlpha = 1;
   }
 
   gameLoop(timestamp) {
@@ -901,5 +1049,11 @@ class Game {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  new Game();
+  loadAssets()
+    .then((assets) => {
+      new Game(assets);
+    })
+    .catch((error) => {
+      console.error("Failed to load assets", error);
+    });
 });
