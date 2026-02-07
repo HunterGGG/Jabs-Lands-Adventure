@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jabs Lands Adventure</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-root" class="state-menu">
+    <canvas id="game-canvas" width="640" height="360" aria-label="Jabs Lands Adventure"></canvas>
+
+    <div id="menu" class="overlay visible" role="dialog" aria-label="Main menu">
+      <div class="menu-panel">
+        <div class="menu-scene">
+          <div class="menu-glow"></div>
+          <div class="menu-hero">
+            <div class="hero-hat"></div>
+            <div class="hero-body"></div>
+            <div class="hero-staff"></div>
+          </div>
+          <div class="menu-trees"></div>
+        </div>
+        <h1 class="menu-title">JABS LANDS ADVENTURE</h1>
+        <div id="menu-main" class="menu-section visible">
+          <div class="menu-buttons">
+            <button id="new-game">New Game</button>
+            <button id="continue">Continue</button>
+            <button id="exit">Exit</button>
+          </div>
+          <p class="menu-hint">Тёмный пиксельный мир, где жаба-маг ищет свет в сумраке.</p>
+        </div>
+        <div id="menu-pause" class="menu-section">
+          <div class="menu-buttons">
+            <button id="resume">Resume</button>
+            <button id="save-exit">Save &amp; Exit</button>
+            <button id="exit-main">Exit to Main Menu</button>
+          </div>
+          <p class="menu-hint">Тьма замирает, пока жаба отдыхает.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="hud" class="overlay">
+      <div class="hud-panel">
+        <div class="stat">
+          <span class="stat-icon">❤</span>
+          <span id="hp">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">✦</span>
+          <span id="mana">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">◆</span>
+          <span id="level">1</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">¤</span>
+          <span id="coins">0</span>
+        </div>
+      </div>
+    </div>
+
+    <button id="mobile-menu" class="menu-toggle">Menu</button>
+
+    <div id="titles" class="overlay">
+      <div class="titles-panel">
+        <div class="titles-label">Chronicles of the Swamp</div>
+        <div class="titles-name">Jabs Lands Adventure</div>
+        <div class="titles-sub">Глава I — Шёпот леса</div>
+        <button id="skip-titles" class="titles-skip">Skip</button>
+      </div>
+    </div>
+
+    <div id="dialogue" class="overlay">
+      <div class="dialogue-frame">
+        <div class="dialogue-portrait"></div>
+        <div class="dialogue-content">
+          <div id="dialogue-text"></div>
+          <div id="dialogue-options"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="controls" class="overlay">
+      <div id="joystick" class="joystick">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+      <div class="action-buttons">
+        <button id="action-1">Cast</button>
+        <button id="action-2">Interact</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

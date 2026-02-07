@@ -1,0 +1,439 @@
+:root {
+  color-scheme: dark;
+  font-family: "Courier New", "Trebuchet MS", system-ui, sans-serif;
+  background: #0b0d10;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #1a1c22, #07080b);
+  color: #e3e7f1;
+}
+
+#game-root {
+  position: relative;
+  width: min(96vw, 1024px);
+  aspect-ratio: 16 / 9;
+  border: 3px solid #1b1f2a;
+  background: #07080c;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(7, 9, 14, 0.8);
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.overlay.visible {
+  pointer-events: auto;
+}
+
+#menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.96);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+  z-index: 6;
+}
+
+#menu.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.menu-panel {
+  width: min(460px, 84%);
+  border: 4px solid #2f3648;
+  background: #0d0f16;
+  padding: 1.5rem;
+  box-shadow: inset 0 0 0 2px #0b0d14, 0 0 20px rgba(5, 7, 12, 0.8);
+}
+
+.menu-section {
+  display: none;
+}
+
+.menu-section.visible {
+  display: block;
+}
+
+.menu-scene {
+  position: relative;
+  height: 160px;
+  border: 2px solid #272d3a;
+  background: linear-gradient(#0a0f14 30%, #111926 60%, #0c1016 100%);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.menu-glow {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 200, 120, 0.5), transparent 70%);
+  top: 20px;
+  left: 40px;
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.menu-hero {
+  position: absolute;
+  width: 48px;
+  height: 64px;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+}
+
+.hero-hat {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  width: 32px;
+  height: 16px;
+  background: #3a2d52;
+  border: 2px solid #1d162c;
+}
+
+.hero-body {
+  position: absolute;
+  bottom: 0;
+  left: 4px;
+  width: 40px;
+  height: 40px;
+  background: #5b7d4a;
+  border: 2px solid #293628;
+}
+
+.hero-staff {
+  position: absolute;
+  right: -2px;
+  bottom: 8px;
+  width: 6px;
+  height: 44px;
+  background: #4a3b2e;
+  border: 2px solid #221912;
+}
+
+.menu-trees {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: repeating-linear-gradient(
+    90deg,
+    #1a2a1d 0 20px,
+    #243320 20px 40px,
+    #151f1c 40px 60px
+  );
+}
+
+.menu-title {
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d3e2ff;
+  text-shadow: 2px 2px 0 #111724, 4px 4px 0 #06080f;
+  animation: flicker 4s ease-in-out infinite;
+}
+
+.menu-buttons {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.2rem 0;
+}
+
+button {
+  font: inherit;
+  padding: 0.6rem 1rem;
+  border-radius: 2px;
+  border: 2px solid #3b4257;
+  background: linear-gradient(180deg, #1a1f2b, #10131c);
+  color: #e3e7f1;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  box-shadow: inset 0 0 0 2px #0c0f15;
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover,
+button:focus-visible {
+  background: linear-gradient(180deg, #262c3c, #171c28);
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 2px #1d2432, 0 0 8px rgba(124, 177, 112, 0.5);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: inset 0 0 0 2px #0c0f15;
+}
+
+.menu-hint {
+  font-size: 0.9rem;
+  color: #98a3bf;
+}
+
+#hud {
+  display: none;
+  padding: 0.8rem;
+}
+
+#game-root.state-gameplay #hud {
+  display: block;
+}
+
+.hud-panel {
+  display: inline-flex;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 2px solid #2d3243;
+  background: rgba(10, 12, 18, 0.8);
+  box-shadow: inset 0 0 0 2px #0c0f15;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #d8e0ff;
+}
+
+.stat-icon {
+  color: #7bc3a2;
+  text-shadow: 1px 1px 0 #0d121b;
+}
+
+#dialogue {
+  bottom: 0;
+  top: auto;
+  min-height: 30%;
+  display: none;
+}
+
+#dialogue.visible {
+  display: block;
+  pointer-events: auto;
+}
+
+.dialogue-frame {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem;
+  padding: 1rem;
+  border: 3px solid #2d3345;
+  background: rgba(10, 12, 18, 0.95);
+  box-shadow: inset 0 0 0 2px #0c0f15;
+}
+
+.dialogue-portrait {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #2c3a2c, #141a1f);
+  border: 2px solid #3b4257;
+}
+
+.dialogue-content {
+  flex: 1;
+}
+
+#dialogue-text {
+  font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+  line-height: 1.4;
+  color: #e2e8ff;
+}
+
+#dialogue-options button {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+#controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 1rem;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.joystick {
+  width: 120px;
+  height: 120px;
+  border-radius: 8px;
+  border: 2px solid #2f3648;
+  background: rgba(12, 14, 20, 0.7);
+  position: relative;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: inset 0 0 0 2px #0c0f15;
+}
+
+.joystick-knob {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: #5f6aa2;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 0 0 2px #2c344f;
+}
+
+.action-buttons {
+  display: grid;
+  gap: 0.6rem;
+  pointer-events: auto;
+}
+
+#controls button {
+  min-width: 90px;
+  border-radius: 4px;
+}
+
+.menu-toggle {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 5;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  display: none;
+  pointer-events: auto;
+}
+
+#game-root.state-gameplay .menu-toggle {
+  display: block;
+}
+
+#titles {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: rgba(5, 6, 10, 0.8);
+  z-index: 5;
+}
+
+#titles.visible {
+  display: flex;
+  pointer-events: auto;
+}
+
+.titles-panel {
+  border: 3px solid #2d3345;
+  padding: 1.5rem 2rem;
+  background: rgba(10, 12, 18, 0.9);
+  box-shadow: inset 0 0 0 2px #0c0f15;
+}
+
+.titles-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #91a0c9;
+  margin-bottom: 0.5rem;
+}
+
+.titles-name {
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  color: #e5edff;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-shadow: 2px 2px 0 #0b0f18;
+  margin-bottom: 0.5rem;
+}
+
+.titles-sub {
+  font-size: 0.95rem;
+  color: #b6c2e2;
+  margin-bottom: 1rem;
+}
+
+.titles-skip {
+  display: none;
+  margin: 0 auto;
+  font-size: 0.7rem;
+}
+
+@media (pointer: fine) {
+  .titles-skip {
+    display: inline-block;
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+@media (pointer: fine) {
+  #controls {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  #game-root {
+    width: 100vw;
+    height: 100vh;
+    aspect-ratio: auto;
+  }
+
+  .hud-panel {
+    flex-wrap: wrap;
+  }
+
+  .menu-panel {
+    width: min(92%, 420px);
+  }
+}
